@@ -24,25 +24,27 @@ interface Assignment {
   exercises: ProgramExercise[];
 }
 
-// Works with either a list of days (["Mon", "Wed"]) or a plain number (3)
-function getDayInfo(value: unknown): { labels: string[]; count: number } {
-  if (Array.isArray(value)) return { labels: value.map(String), count: value.length };
-  if (typeof value === "number") return { labels: [], count: value };
-  return { labels: [], count: 0 };
+// Turns whatever is stored for an exercise into a list of day names
+function toDayLabels(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value === "string") return value.split(",").map((s) => s.trim()).filter(Boolean);
+  if (value && typeof value === "object") {
+    // { mon: true, tue: false, wed: true } -> ["mon", "wed"]
+    return Object.entries(value).filter(([, v]) => v).map(([k]) => k);
+  }
+  return [];
 }
 
-// Days per exercise, plus the number of distinct days the whole program covers
-function summarizeDays(a: Assignment) {
-  const allLabels = new Set<string>();
-  let maxCount = 0;
-  const exercises = a.exercises.map((ex) => {
-    const raw = a.exerciseDays?.[String(ex.id)] ?? a.exerciseDays?.[ex.name];
-    const info = getDayInfo(raw);
-    info.labels.forEach((label) => allLabels.add(label));
-    maxCount = Math.max(maxCount, info.count);
-    return { ...ex, ...info };
-  });
-  return { exercises, numOfDays: allLabels.size || maxCount };
+// Supports both shapes of exerciseDays:
+//   exercise -> days:  { "12": ["Mon", "Wed"] }  (key is the exercise id or name)
+//   day -> exercises:  { "Mon": [12, 15], "Wed": [12] }
+function getExerciseDays(map: Record<string, unknown> | null, ex: ProgramExercise): string[] {
+  if (!map) return [];
+  const direct = map[String(ex.id)] ?? map[ex.name];
+  if (direct !== undefined && direct !== null) return toDayLabels(direct);
+  return Object.entries(map)
+    .filter(([, v]) => Array.isArray(v) && v.some((x) => String(x) === String(ex.id) || String(x) === ex.name))
+    .map(([day]) => day);
 }
 
 interface Customer {
@@ -174,38 +176,34 @@ export default function CustomerDetailPage() {
           ) : (
             <ul className="space-y-3">
               {assignments.map((a) => {
-                const { exercises, numOfDays } = summarizeDays(a);
+                const exercises = a.exercises.map((ex) => ({ ...ex, days: getExerciseDays(a.exerciseDays, ex) }));
                 return (
                   <li key={a.id} className="p-4 rounded-lg bg-gray-50">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-base">📋</span>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{a.programName}</p>
-                          <p className="text-xs text-gray-400">{new Date(a.assignedAt).toLocaleDateString()}</p>
-                        </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">📋</span>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{a.programName}</p>
+                        <p className="text-xs text-gray-400">{new Date(a.assignedAt).toLocaleDateString()}</p>
                       </div>
-                      {numOfDays > 0 && (
-                        <span className="text-xs font-medium text-emerald-700 bg-emerald-50 rounded-full px-2.5 py-1 whitespace-nowrap">
-                          {numOfDays} {numOfDays === 1 ? "day" : "days"}
-                        </span>
-                      )}
                     </div>
 
                     {exercises.length > 0 && (
-                      <ul className="mt-3 space-y-1.5 border-t border-gray-100 pt-3">
+                      <ul className="mt-3 space-y-3 border-t border-gray-100 pt-3">
                         {exercises.map((ex) => (
-                          <li key={ex.id} className="flex items-start justify-between gap-3 text-xs text-gray-600">
-                            <div>
-                              <span>{ex.name}</span>
-                              {ex.labels.length > 0 && (
-                                <p className="text-gray-400 mt-0.5">{ex.labels.join(", ")}</p>
-                              )}
+                          <li key={ex.id}>
+                            <div className="flex items-center justify-between gap-3 text-xs text-gray-600">
+                              <span className="font-medium">{ex.name}</span>
+                              <span className="text-gray-400 whitespace-nowrap">{ex.sets} × {ex.reps}</span>
                             </div>
-                            <span className="text-gray-400 whitespace-nowrap">
-                              {ex.sets} × {ex.reps}
-                              {ex.count > 0 && ` · ${ex.count} ${ex.count === 1 ? "day" : "days"}`}
-                            </span>
+                            {ex.days.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                {ex.days.map((day) => (
+                                  <span key={day} className="text-[11px] font-medium text-emerald-700 bg-emerald-50 rounded-md px-2 py-0.5">
+                                    {day}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </li>
                         ))}
                       </ul>
