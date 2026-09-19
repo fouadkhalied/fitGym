@@ -1,0 +1,84 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = []
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id          Int           @id @default(autoincrement())
+  name        String
+  phone       String
+  email       String?
+  age         Int?
+  gender      String?
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  assignments Assignment[]
+
+  @@index([name])
+  @@index([phone])
+}
+
+model Exercise {
+  id           Int                   @id @default(autoincrement())
+  name         String
+  description  String?
+  sets         Int                   @default(3)
+  reps         Int                   @default(10)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  programItems ExerciseProgramItem[]
+  assignments  Assignment[]
+
+  @@index([name])
+}
+
+model ExerciseProgram {
+  id          Int                   @id @default(autoincrement())
+  name        String
+  description String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  items       ExerciseProgramItem[]
+  assignments Assignment[]
+
+  @@index([name])
+}
+
+model ExerciseProgramItem {
+  id        Int             @id @default(autoincrement())
+  programId Int
+  exerciseId Int
+  order     Int
+  sets      Int
+  reps      Int
+  program   ExerciseProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  exercise  Exercise        @relation(fields: [exerciseId], references: [id])
+
+  @@unique([programId, exerciseId])
+  @@index([programId])
+}
+
+model Assignment {
+  id         Int              @id @default(autoincrement())
+  customerId Int
+  programId  Int?
+  exerciseId Int?
+  sets       Int?
+  reps       Int?
+  notes      String?
+  assignedAt DateTime         @default(now())
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  customer   Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  program    ExerciseProgram? @relation(fields: [programId], references: [id])
+  exercise   Exercise?        @relation(fields: [exerciseId], references: [id])
+
+  @@index([customerId])
+  @@index([assignedAt])
+}

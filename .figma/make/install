@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+pnpm install --prefer-offline --no-frozen-lockfile
+
+# Recreate .env if missing (Figma Make environment doesn't persist it)
+if [ ! -f .env ]; then
+  printf 'DATABASE_URL="postgresql://neondb_owner:npg_XcOh9ybDFYw4@ep-cool-glitter-b4qiv3mj-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"\nNEXT_PUBLIC_DATABASE_URL="postgresql://neondb_owner:npg_XcOh9ybDFYw4@ep-cool-glitter-b4qiv3mj-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"\n' > .env
+fi
+
+pnpm exec tailwindcss -i ./tailwind-input.css -o ./public/tailwind.css --minify
+pnpm exec prisma generate

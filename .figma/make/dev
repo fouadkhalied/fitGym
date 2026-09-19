@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Ensure DATABASE_URL is always available
+if [ ! -f .env ]; then
+  printf 'DATABASE_URL="postgresql://neondb_owner:npg_XcOh9ybDFYw4@ep-cool-glitter-b4qiv3mj-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"\nNEXT_PUBLIC_DATABASE_URL="postgresql://neondb_owner:npg_XcOh9ybDFYw4@ep-cool-glitter-b4qiv3mj-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"\n' > .env
+fi
+
+pnpm run dev
