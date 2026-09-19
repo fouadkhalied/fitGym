@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useI18n } from "@/lib/i18n";
 import { sql } from "@/lib/db";
 import { Modal } from "@/components/ui/Modal";
@@ -30,7 +30,9 @@ export default function CustomersPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -40,10 +42,15 @@ export default function CustomersPage() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Used to ignore responses from older requests that finish after newer ones
+  const requestId = useRef(0);
+
   const fetchCustomers = useCallback(async () => {
+    const currentRequest = ++requestId.current;
     setLoading(true);
+    setLoadError(false);
     try {
-      const like = `%${search}%`;
+      const like = `%${debouncedSearch}%`;
       const offset = (page - 1) * PAGE_SIZE;
       const [countRows, rows] = await Promise.all([
         sql`SELECT COUNT(*)::int AS count FROM "Customer" WHERE name ILIKE ${like} OR phone ILIKE ${like}`,
@@ -51,20 +58,33 @@ export default function CustomersPage() {
             WHERE name ILIKE ${like} OR phone ILIKE ${like}
             ORDER BY "createdAt" DESC LIMIT ${PAGE_SIZE} OFFSET ${offset}`,
       ]);
+      if (currentRequest !== requestId.current) return;
       const total = (countRows[0] as { count: number }).count;
       setCustomers(rows as Customer[]);
       setTotalPages(Math.max(1, Math.ceil(total / PAGE_SIZE)));
+    } catch (e) {
+      console.error("Failed to load customers:", e);
+      if (currentRequest === requestId.current) {
+        setCustomers([]);
+        setLoadError(true);
+      }
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
-  }, [page, search]);
+  }, [page, debouncedSearch]);
 
   useEffect(() => {
-    const timer = setTimeout(fetchCustomers, search ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [fetchCustomers, search]);
+    fetchCustomers();
+  }, [fetchCustomers]);
 
-  useEffect(() => { setPage(1); }, [search]);
+  // Debounce the search box; reset to page 1 in the same update so only one fetch runs
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   function openAdd() { setEditing(null); setForm(emptyForm); setErrors({}); setModalOpen(true); }
   function openEdit(c: Customer) {
@@ -87,19 +107,23 @@ export default function CustomersPage() {
     if (!validate()) return;
     setSaving(true);
     try {
-      const age = form.age ? Number(form.age) : null;
-      const email = form.email || null;
+      const name = form.name.trim();
+      const phone = form.phone.trim();
+      const parsedAge = form.age ? parseInt(form.age, 10) : NaN; // age is an Int column
+      const age = Number.isNaN(parsedAge) ? null : parsedAge;
+      const email = form.email.trim() || null;
       const gender = form.gender || null;
-      const notes = form.notes || null;
+      const notes = form.notes.trim() || null;
       if (editing) {
-        await sql`UPDATE "Customer" SET name=${form.name}, phone=${form.phone}, email=${email}, age=${age}, gender=${gender}, notes=${notes}, "updatedAt"=NOW() WHERE id=${editing.id}`;
+        await sql`UPDATE "Customer" SET name=${name}, phone=${phone}, email=${email}, age=${age}, gender=${gender}, notes=${notes}, "updatedAt"=NOW() WHERE id=${editing.id}`;
       } else {
-        await sql`INSERT INTO "Customer" (name, phone, email, age, gender, notes, "createdAt", "updatedAt") VALUES (${form.name}, ${form.phone}, ${email}, ${age}, ${gender}, ${notes}, NOW(), NOW())`;
+        await sql`INSERT INTO "Customer" (name, phone, email, age, gender, notes, "createdAt", "updatedAt") VALUES (${name}, ${phone}, ${email}, ${age}, ${gender}, ${notes}, NOW(), NOW())`;
       }
       setModalOpen(false);
       setToast({ message: editing ? "Customer updated" : "Customer added", type: "success" });
       fetchCustomers();
-    } catch {
+    } catch (e) {
+      console.error("Failed to save customer:", e);
       setToast({ message: t.common.error, type: "error" });
     } finally {
       setSaving(false);
@@ -113,8 +137,11 @@ export default function CustomersPage() {
       await sql`DELETE FROM "Customer" WHERE id=${deleteTarget.id}`;
       setDeleteTarget(null);
       setToast({ message: "Customer deleted", type: "success" });
-      fetchCustomers();
-    } catch {
+      // If that was the last row on this page, step back so we don't land on an empty page
+      if (customers.length === 1 && page > 1) setPage(page - 1);
+      else fetchCustomers();
+    } catch (e) {
+      console.error("Failed to delete customer:", e);
       setToast({ message: t.common.error, type: "error" });
     } finally {
       setDeleting(false);
@@ -131,6 +158,12 @@ export default function CustomersPage() {
       </div>
 
       <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.customers.search} className={inputCls} />
+
+      {loadError && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
+          ⚠️ {t.common.error}
+        </div>
+      )}
 
       {/* Desktop table */}
       <div className="hidden md:block bg-white rounded-xl border border-gray-100 overflow-hidden">
@@ -207,7 +240,7 @@ export default function CustomersPage() {
           </FormField>
           <div className="grid grid-cols-2 gap-3">
             <FormField label={t.customers.age} optional>
-              <input type="number" className={inputCls} value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} />
+              <input type="number" min={0} step={1} className={inputCls} value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} />
             </FormField>
             <FormField label={t.customers.gender} optional>
               <select className={selectCls} value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
