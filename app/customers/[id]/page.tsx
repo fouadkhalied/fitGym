@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 
 interface ProgramExercise {
+  id: number;
   name: string;
   sets: number;
   reps: number;
@@ -18,7 +19,30 @@ interface Assignment {
   programName: string;
   notes: string | null;
   assignedAt: string | Date;
+  // Prisma `Json` column: the days chosen for each exercise, e.g. { "12": ["Mon", "Wed"] }
+  exerciseDays: Record<string, unknown> | null;
   exercises: ProgramExercise[];
+}
+
+// Works with either a list of days (["Mon", "Wed"]) or a plain number (3)
+function getDayInfo(value: unknown): { labels: string[]; count: number } {
+  if (Array.isArray(value)) return { labels: value.map(String), count: value.length };
+  if (typeof value === "number") return { labels: [], count: value };
+  return { labels: [], count: 0 };
+}
+
+// Days per exercise, plus the number of distinct days the whole program covers
+function summarizeDays(a: Assignment) {
+  const allLabels = new Set<string>();
+  let maxCount = 0;
+  const exercises = a.exercises.map((ex) => {
+    const raw = a.exerciseDays?.[String(ex.id)] ?? a.exerciseDays?.[ex.name];
+    const info = getDayInfo(raw);
+    info.labels.forEach((label) => allLabels.add(label));
+    maxCount = Math.max(maxCount, info.count);
+    return { ...ex, ...info };
+  });
+  return { exercises, numOfDays: allLabels.size || maxCount };
 }
 
 interface Customer {
@@ -61,13 +85,13 @@ export default function CustomerDetailPage() {
           // reps live on ExerciseProgramItem, so we aggregate them per program.
           // AT TIME ZONE 'UTC' turns Prisma's timestamp (stored in UTC) into a
           // timestamptz so the browser converts it to local time correctly.
-          sql`SELECT a.id, a.notes,
+          sql`SELECT a.id, a.notes, a."exerciseDays",
                 a."assignedAt" AT TIME ZONE 'UTC' AS "assignedAt",
                 p.id AS "programId",
                 p.name AS "programName",
                 COALESCE(
                   JSON_AGG(
-                    JSON_BUILD_OBJECT('name', e.name, 'sets', epi.sets, 'reps', epi.reps)
+                    JSON_BUILD_OBJECT('id', e.id, 'name', e.name, 'sets', epi.sets, 'reps', epi.reps)
                     ORDER BY epi."order"
                   ) FILTER (WHERE epi.id IS NOT NULL), '[]'
                 ) AS exercises
@@ -149,30 +173,48 @@ export default function CustomerDetailPage() {
             <p className="text-sm text-gray-400">{t.customers.noPrograms}</p>
           ) : (
             <ul className="space-y-3">
-              {assignments.map((a) => (
-                <li key={a.id} className="p-4 rounded-lg bg-gray-50">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">📋</span>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{a.programName}</p>
-                      <p className="text-xs text-gray-400">{new Date(a.assignedAt).toLocaleDateString()}</p>
+              {assignments.map((a) => {
+                const { exercises, numOfDays } = summarizeDays(a);
+                return (
+                  <li key={a.id} className="p-4 rounded-lg bg-gray-50">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">📋</span>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{a.programName}</p>
+                          <p className="text-xs text-gray-400">{new Date(a.assignedAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      {numOfDays > 0 && (
+                        <span className="text-xs font-medium text-emerald-700 bg-emerald-50 rounded-full px-2.5 py-1 whitespace-nowrap">
+                          {numOfDays} {numOfDays === 1 ? "day" : "days"}
+                        </span>
+                      )}
                     </div>
-                  </div>
 
-                  {a.exercises.length > 0 && (
-                    <ul className="mt-3 space-y-1 border-t border-gray-100 pt-3">
-                      {a.exercises.map((ex, i) => (
-                        <li key={i} className="flex items-center justify-between text-xs text-gray-600">
-                          <span>{ex.name}</span>
-                          <span className="text-gray-400">{ex.sets} × {ex.reps}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                    {exercises.length > 0 && (
+                      <ul className="mt-3 space-y-1.5 border-t border-gray-100 pt-3">
+                        {exercises.map((ex) => (
+                          <li key={ex.id} className="flex items-start justify-between gap-3 text-xs text-gray-600">
+                            <div>
+                              <span>{ex.name}</span>
+                              {ex.labels.length > 0 && (
+                                <p className="text-gray-400 mt-0.5">{ex.labels.join(", ")}</p>
+                              )}
+                            </div>
+                            <span className="text-gray-400 whitespace-nowrap">
+                              {ex.sets} × {ex.reps}
+                              {ex.count > 0 && ` · ${ex.count} ${ex.count === 1 ? "day" : "days"}`}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
 
-                  {a.notes && <p className="mt-3 text-xs text-gray-500">{a.notes}</p>}
-                </li>
-              ))}
+                    {a.notes && <p className="mt-3 text-xs text-gray-500">{a.notes}</p>}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
