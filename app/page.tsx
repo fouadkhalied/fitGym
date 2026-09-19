@@ -28,6 +28,16 @@ interface RecentAssignment {
   reps: number | null;
 }
 
+function errorMessage(reason: unknown): string {
+  if (reason instanceof Error) return reason.message;
+  if (typeof reason === "string") return reason;
+  try {
+    return JSON.stringify(reason);
+  } catch {
+    return "Unknown error";
+  }
+}
+
 export default function DashboardPage() {
   const { t } = useI18n();
   const router = useRouter();
@@ -35,36 +45,55 @@ export default function DashboardPage() {
   const [recentCustomers, setRecentCustomers] = useState<RecentCustomer[]>([]);
   const [recentAssignments, setRecentAssignments] = useState<RecentAssignment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
 
   useEffect(() => {
     (async () => {
-      try {
-        const [statsRows, customerRows, assignmentRows] = await Promise.all([
-          sql`SELECT
-            (SELECT COUNT(*)::int FROM "Customer") AS "totalCustomers",
-            (SELECT COUNT(*)::int FROM "Exercise") AS "totalExercises",
-            (SELECT COUNT(*)::int FROM "ExerciseProgram") AS "totalPrograms",
-            (SELECT COUNT(*)::int FROM "Assignment") AS "totalAssignments"`,
-          sql`SELECT id, name, phone FROM "Customer" ORDER BY "createdAt" DESC LIMIT 5`,
-          sql`SELECT a.id, a.sets, a.reps,
-              c.name AS "customerName",
-              p.name AS "programName",
-              e.name AS "exerciseName"
-            FROM "Assignment" a
-            JOIN "Customer" c ON c.id = a."customerId"
-            LEFT JOIN "ExerciseProgram" p ON p.id = a."programId"
-            LEFT JOIN "Exercise" e ON e.id = a."exerciseId"
-            ORDER BY a."assignedAt" DESC LIMIT 5`,
-        ]);
-        setStats(statsRows[0] as Stats);
-        setRecentCustomers(customerRows as RecentCustomer[]);
-        setRecentAssignments(assignmentRows as RecentAssignment[]);
-      } catch {
-        setError(true);
-      } finally {
-        setLoading(false);
+      // allSettled: one failing query no longer takes down the whole dashboard
+      const [statsRes, customersRes, assignmentsRes] = await Promise.allSettled([
+        sql`SELECT
+          (SELECT COUNT(*)::int FROM "Customer") AS "totalCustomers",
+          (SELECT COUNT(*)::int FROM "Exercise") AS "totalExercises",
+          (SELECT COUNT(*)::int FROM "ExerciseProgram") AS "totalPrograms",
+          (SELECT COUNT(*)::int FROM "Assignment") AS "totalAssignments"`,
+        sql`SELECT id, name, phone FROM "Customer" ORDER BY "createdAt" DESC LIMIT 5`,
+        sql`SELECT a.id, a.sets, a.reps,
+            c.name AS "customerName",
+            p.name AS "programName",
+            e.name AS "exerciseName"
+          FROM "Assignment" a
+          JOIN "Customer" c ON c.id = a."customerId"
+          LEFT JOIN "ExerciseProgram" p ON p.id = a."programId"
+          LEFT JOIN "Exercise" e ON e.id = a."exerciseId"
+          ORDER BY a."assignedAt" DESC LIMIT 5`,
+      ]);
+
+      const failures: string[] = [];
+
+      if (statsRes.status === "fulfilled") {
+        setStats(statsRes.value[0] as Stats);
+      } else {
+        failures.push(`Stats: ${errorMessage(statsRes.reason)}`);
       }
+
+      if (customersRes.status === "fulfilled") {
+        setRecentCustomers(customersRes.value as RecentCustomer[]);
+      } else {
+        failures.push(`Recent customers: ${errorMessage(customersRes.reason)}`);
+      }
+
+      if (assignmentsRes.status === "fulfilled") {
+        setRecentAssignments(assignmentsRes.value as RecentAssignment[]);
+      } else {
+        failures.push(`Recent assignments: ${errorMessage(assignmentsRes.reason)}`);
+      }
+
+      if (failures.length > 0) {
+        console.error("Dashboard query failures:", failures);
+        setErrors(failures);
+      }
+
+      setLoading(false);
     })();
   }, []);
 
@@ -93,9 +122,14 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {error && (
+      {errors.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
-          ⚠️ Could not connect to the database. Check your Neon credentials.
+          <p className="font-medium">⚠️ Some dashboard data could not be loaded.</p>
+          <ul className="mt-2 space-y-1 list-disc list-inside break-words">
+            {errors.map((msg) => (
+              <li key={msg}>{msg}</li>
+            ))}
+          </ul>
         </div>
       )}
 
