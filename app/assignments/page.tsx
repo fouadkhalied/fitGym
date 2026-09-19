@@ -95,9 +95,9 @@ export default function AssignmentsPage() {
   useEffect(() => { setPage(1); }, [search, filterCustomer, filterType]);
 
   useEffect(() => {
-    sql`SELECT id, name FROM "Customer" ORDER BY name`.then((r) => setCustomers(r as Customer[]));
-    sql`SELECT id, name, sets, reps FROM "Exercise" ORDER BY name`.then((r) => setExercises(r as Exercise[]));
-    sql`SELECT id, name FROM "ExerciseProgram" ORDER BY name`.then((r) => setPrograms(r as Program[]));
+    sql`SELECT id, name FROM "Customer" ORDER BY name`.then((r: any) => setCustomers(r as Customer[]));
+    sql`SELECT id, name, sets, reps FROM "Exercise" ORDER BY name`.then((r: any) => setExercises(r as Exercise[]));
+    sql`SELECT id, name FROM "ExerciseProgram" ORDER BY name`.then((r: any) => setPrograms(r as Program[]));
   }, []);
 
   function openAdd() { setEditing(null); setForm(emptyForm); setErrors({}); setModalOpen(true); }
@@ -241,26 +241,26 @@ export default function AssignmentsPage() {
       <div className="md:hidden space-y-3">
         {loading ? Array.from({ length: 3 }).map((_, i) => <div key={i} className="bg-white rounded-xl border p-4 animate-pulse h-24" />) :
           assignments.length === 0 ? <EmptyState message={t.assignments.empty} action={{ label: t.assignments.add, onClick: openAdd }} /> :
-          assignments.map((a) => (
-            <div key={a.id} className="bg-white rounded-xl border border-gray-100 p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-semibold text-gray-900 text-sm">{a.customer.name}</p>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${a.program ? "bg-indigo-50 text-indigo-600" : "bg-emerald-50 text-emerald-600"}`}>
-                    {a.program ? t.assignments.typeProgram : t.assignments.typeExercise}
-                  </span>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {a.program ? a.program.name : `${a.exercise?.name} · ${a.sets ?? a.exercise?.sets}×${a.reps ?? a.exercise?.reps}`}
-                  </p>
-                  <p className="text-xs text-gray-300 mt-0.5">{new Date(a.assignedAt).toLocaleDateString()}</p>
-                </div>
-                <div className="flex gap-1 flex-shrink-0">
-                  <button onClick={() => openEdit(a)} className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-600">{t.common.edit}</button>
-                  <button onClick={() => setDeleteTarget(a)} className="text-xs px-2 py-1 rounded border border-red-200 text-red-500">{t.common.delete}</button>
+            assignments.map((a) => (
+              <div key={a.id} className="bg-white rounded-xl border border-gray-100 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 text-sm">{a.customer.name}</p>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${a.program ? "bg-indigo-50 text-indigo-600" : "bg-emerald-50 text-emerald-600"}`}>
+                      {a.program ? t.assignments.typeProgram : t.assignments.typeExercise}
+                    </span>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {a.program ? a.program.name : `${a.exercise?.name} · ${a.sets ?? a.exercise?.sets}×${a.reps ?? a.exercise?.reps}`}
+                    </p>
+                    <p className="text-xs text-gray-300 mt-0.5">{new Date(a.assignedAt).toLocaleDateString()}</p>
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <button onClick={() => openEdit(a)} className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-600">{t.common.edit}</button>
+                    <button onClick={() => setDeleteTarget(a)} className="text-xs px-2 py-1 rounded border border-red-200 text-red-500">{t.common.delete}</button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            ))
         }
       </div>
 

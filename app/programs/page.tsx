@@ -89,7 +89,7 @@ export default function ProgramsPage() {
   useEffect(() => { setPage(1); }, [search]);
 
   useEffect(() => {
-    sql`SELECT id, name, sets, reps FROM "Exercise" ORDER BY name`.then((rows) => setExercises(rows as Exercise[]));
+    sql`SELECT id, name, sets, reps FROM "Exercise" ORDER BY name`.then((rows: any) => setExercises(rows as Exercise[]));
   }, []);
 
   function openAdd() {
