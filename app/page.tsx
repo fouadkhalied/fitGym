@@ -22,10 +22,7 @@ interface RecentCustomer {
 interface RecentAssignment {
   id: number;
   customerName: string;
-  programName: string | null;
-  exerciseName: string | null;
-  sets: number | null;
-  reps: number | null;
+  programName: string;
 }
 
 function errorMessage(reason: unknown): string {
@@ -57,14 +54,12 @@ export default function DashboardPage() {
           (SELECT COUNT(*)::int FROM "ExerciseProgram") AS "totalPrograms",
           (SELECT COUNT(*)::int FROM "Assignment") AS "totalAssignments"`,
         sql`SELECT id, name, phone FROM "Customer" ORDER BY "createdAt" DESC LIMIT 5`,
-        sql`SELECT a.id, a.sets, a.reps,
+        sql`SELECT a.id,
             c.name AS "customerName",
-            p.name AS "programName",
-            e.name AS "exerciseName"
+            p.name AS "programName"
           FROM "Assignment" a
           JOIN "Customer" c ON c.id = a."customerId"
-          LEFT JOIN "ExerciseProgram" p ON p.id = a."programId"
-          LEFT JOIN "Exercise" e ON e.id = a."exerciseId"
+          JOIN "ExerciseProgram" p ON p.id = a."programId"
           ORDER BY a."assignedAt" DESC LIMIT 5`,
       ]);
 
@@ -187,9 +182,7 @@ export default function DashboardPage() {
               {recentAssignments.map((a) => (
                 <li key={a.id} className="py-3">
                   <p className="text-sm font-medium text-gray-900">{a.customerName}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {a.programName ?? `${a.exerciseName} ${a.sets ?? ""}×${a.reps ?? ""}`}
-                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">{a.programName}</p>
                 </li>
               ))}
             </ul>
