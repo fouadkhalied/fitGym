@@ -240,17 +240,19 @@ export default function ProgramsPage() {
             ) : (
               <div className="space-y-2">
                 {formItems.map((item, idx) => (
-                  <div key={item.exerciseId} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <div className="flex flex-col gap-0.5">
-                      <button onClick={() => moveItem(idx, -1)} disabled={idx === 0} className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-30">▲</button>
-                      <button onClick={() => moveItem(idx, 1)} disabled={idx === formItems.length - 1} className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-30">▼</button>
+                  <div key={item.exerciseId} className="flex flex-col gap-2 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="flex flex-col gap-0.5">
+                        <button onClick={() => moveItem(idx, -1)} disabled={idx === 0} className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-30">▲</button>
+                        <button onClick={() => moveItem(idx, 1)} disabled={idx === formItems.length - 1} className="text-xs text-gray-400 hover:text-gray-600 disabled:opacity-30">▼</button>
+                      </div>
+                      <span className="text-xs text-gray-400 w-5 text-center">{idx + 1}</span>
+                      <p className="flex-1 text-sm font-medium text-gray-800">{item.exerciseName}</p>
+                      <input type="number" min="1" value={item.sets} onChange={(e) => updateItem(idx, "sets", e.target.value)} className="w-14 text-center text-sm border border-gray-200 rounded-md px-2 py-1" />
+                      <span className="text-xs text-gray-400">×</span>
+                      <input type="number" min="1" value={item.reps} onChange={(e) => updateItem(idx, "reps", e.target.value)} className="w-14 text-center text-sm border border-gray-200 rounded-md px-2 py-1" />
+                      <button onClick={() => removeItem(idx)} className="text-gray-400 hover:text-red-500 transition-colors text-sm">✕</button>
                     </div>
-                    <span className="text-xs text-gray-400 w-5 text-center">{idx + 1}</span>
-                    <p className="flex-1 text-sm font-medium text-gray-800">{item.exerciseName}</p>
-                    <input type="number" min="1" value={item.sets} onChange={(e) => updateItem(idx, "sets", e.target.value)} className="w-14 text-center text-sm border border-gray-200 rounded-md px-2 py-1" />
-                    <span className="text-xs text-gray-400">×</span>
-                    <input type="number" min="1" value={item.reps} onChange={(e) => updateItem(idx, "reps", e.target.value)} className="w-14 text-center text-sm border border-gray-200 rounded-md px-2 py-1" />
-                    <button onClick={() => removeItem(idx)} className="text-gray-400 hover:text-red-500 transition-colors text-sm">✕</button>
                   </div>
                 ))}
               </div>

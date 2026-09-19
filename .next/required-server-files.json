@@ -1,7 +1,9 @@
 {
   "version": 1,
   "config": {
-    "env": {},
+    "env": {
+      "NEXT_PUBLIC_DATABASE_URL": "postgresql://neondb_owner:npg_XcOh9ybDFYw4@ep-cool-glitter-b4qiv3mj-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require"
+    },
     "webpack": null,
     "eslint": {
       "ignoreDuringBuilds": false

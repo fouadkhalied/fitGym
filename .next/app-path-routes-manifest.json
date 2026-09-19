@@ -1,9 +1,9 @@
 {
   "/_not-found/page": "/_not-found",
-  "/assignments/page": "/assignments",
-  "/customers/page": "/customers",
-  "/programs/page": "/programs",
   "/customers/[id]/page": "/customers/[id]",
+  "/customers/page": "/customers",
+  "/page": "/",
   "/exercises/page": "/exercises",
-  "/page": "/"
+  "/assignments/page": "/assignments",
+  "/programs/page": "/programs"
 }
